@@ -1,36 +1,31 @@
-# Nome do workflow, conforme especificado no curso
+# Nome do workflow
 name: COBOL Check Automation
 
-# Define que o workflow será acionado apenas quando houver um 'push' para a branch 'main'
+# Aciona o workflow em push para a branch main
 on:
   push:
     branches: [ main ]
 
-# Define os jobs (tarefas) que o workflow irá executar
 jobs:
-  # O nome do nosso job principal
   cobol-check:
-    # O tipo de máquina virtual que o job irá rodar
     runs-on: ubuntu-latest
-
-    # Define a sequência de passos que o job executará
     steps:
-      # 1. Faz o checkout do seu repositório para que o workflow possa acessá-lo
+      # 1. Faz o checkout do repositório
       - uses: actions/checkout@v2
 
-      # 2. Configura o ambiente Java, que é um pré-requisito para o COBOL Check
+      # 2. Configura o ambiente Java
       - name: Set up Java
         uses: actions/setup-java@v2
         with:
           java-version: '11'
           
-      # 3. Este passo irá executar os comandos do COBOL Check
-      # Ele usa os segredos (secrets) que você configurou para se autenticar no mainframe
-      - name: Run COBOL Check
+      # 3. PASSO ATUALIZADO: Configura o ambiente no Mainframe e faz o Upload do COBOL Check
+      # Este passo executa o script zowe_operations.sh que você criou
+      - name: Setup Mainframe Environment and Upload COBOL Check
         env:
           ZOWE_USERNAME: ${{ secrets.ZOWE_USERNAME }}
           ZOWE_PASSWORD: ${{ secrets.ZOWE_PASSWORD }}
         run: |
-          # Por enquanto, vamos apenas exibir uma mensagem.
-          # Nos próximos passos do curso, adicionaremos os comandos reais aqui.
-          echo "Workflow configurado. Pronto para os comandos do COBOL Check."
+          chmod +x .github/scripts/zowe_operations.sh
+          .github/scripts/zowe_operations.sh
+
