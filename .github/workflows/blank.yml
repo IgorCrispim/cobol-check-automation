@@ -19,8 +19,7 @@ jobs:
         with:
           java-version: '11'
           
-      # 3. PASSO ATUALIZADO: Configura o ambiente no Mainframe e faz o Upload do COBOL Check
-      # Este passo executa o script zowe_operations.sh que você criou
+      # 3. Configura o ambiente no Mainframe e faz o Upload do COBOL Check
       - name: Setup Mainframe Environment and Upload COBOL Check
         env:
           ZOWE_USERNAME: ${{ secrets.ZOWE_USERNAME }}
@@ -29,3 +28,21 @@ jobs:
           chmod +x .github/scripts/zowe_operations.sh
           .github/scripts/zowe_operations.sh
 
+      # 4. NOVO PASSO: Executa o COBOL Check no Mainframe
+      # Este passo executa o script mainframe_operations.sh que você acabou de criar
+      - name: Run COBOL Check on Mainframe
+        env:
+          ZOWE_USERNAME: ${{ secrets.ZOWE_USERNAME }}
+          ZOWE_PASSWORD: ${{ secrets.ZOWE_PASSWORD }}
+        run: |
+          zowe zos-uss ssh "cd /z/$(echo ${{ secrets.ZOWE_USERNAME }} | tr '[:upper:]' '[:lower:]')/cobolcheck && ./.github/scripts/mainframe_operations.sh"
+```eof
+
+### O que Fazer Agora:
+
+1.  **Copie** o código do bloco acima.
+2.  **Cole** no editor do GitHub, substituindo o conteúdo antigo do seu `main.yml`.
+3.  No final da página, escreva uma mensagem de commit, como "Adiciona passo para executar testes no mainframe".
+4.  Clique em **"Commit changes"**.
+
+Mais uma vez, peço desculpas pelo erro. Após salvar esta versão final do workflow, o próximo passo será criar os arquivos JCL.
