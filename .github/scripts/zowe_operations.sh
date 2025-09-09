@@ -1,22 +1,28 @@
 #!/bin/bash
-
 # zowe_operations.sh
 
-# Converte o nome de usuário para minúsculas para criar o caminho do diretório
-LOWERCASE_USERNAME=$(echo "$ZOWE_USERNAME" | tr '[:upper:]' '[:lower:]')
+# Converte o nome de utilizador para minúsculas
+LOWERCASE_USERNAME=$(echo "$ZOWE_CLI_USER" | tr '[:upper:]' '[:lower:]')
 
-# Verifica se o diretório existe no mainframe e, se não, o cria
-if ! zowe zos-files list uss-files "/z/$LOWERCASE_USERNAME/cobolcheck" &>/dev/null; then
+# Define as opções de conexão para usar em todos os comandos Zowe
+# As variáveis (ZOWE_CLI_HOST, etc.) vêm do ficheiro main.yml
+CONN_OPTS="--host $ZOWE_CLI_HOST --port $ZOWE_CLI_PORT --user $ZOWE_CLI_USER --password $ZOWE_CLI_PASSWORD"
+
+# Verifica se o diretório existe, cria se não existir
+# A opção --sshs-fingerprint-check false é para evitar prompts de confirmação de SSH
+if ! zowe zos-files list uss-files "/z/$LOWERCASE_USERNAME/cobolcheck" $CONN_OPTS --sshs-fingerprint-check false &>/dev/null; then
   echo "Diretório não existe. Criando..."
-  zowe zos-files create uss-directory "/z/$LOWERCASE_USERNAME/cobolcheck"
+  zowe zos-files create uss-directory "/z/$LOWERCASE_USERNAME/cobolcheck" $CONN_OPTS --sshs-fingerprint-check false
 else
   echo "Diretório já existe."
 fi
 
-# Faz o upload da pasta 'cobol-check' do repositório para o diretório no mainframe
-# A opção --binary-files garante que o arquivo .jar não seja corrompido
-zowe zos-files upload dir-to-uss "./cobol-check" "/z/$LOWERCASE_USERNAME/cobolcheck" --recursive --binary-files "*.jar"
+# Faz o upload dos ficheiros
+echo "A fazer o upload dos ficheiros do COBOL Check..."
+zowe zos-files upload dir-to-uss "./cobol-check" "/z/$LOWERCASE_USERNAME/cobolcheck" --recursive \
+  --binary-files "*.jar" $CONN_OPTS --sshs-fingerprint-check false
 
-# Verifica se o upload foi bem-sucedido listando os arquivos no mainframe
-echo "Verificando upload:"
-zowe zos-files list uss-files "/z/$LOWERCASE_USERNAME/cobolcheck"
+# Verifica o upload
+echo "Verificando o upload:"
+zowe zos-files list uss-files "/z/$LOWERCASE_USERNAME/cobolcheck" $CONN_OPTS --sshs-fingerprint-check false
+
