@@ -18,13 +18,14 @@ jobs:
         uses: actions/setup-java@v2
         with:
           java-version: '11'
-          distribution: 'temurin' # CORREÇÃO: Adicionada a distribuição do Java
+          distribution: 'temurin'
       
-      # 3. NOVO PASSO: Instala a ferramenta Zowe CLI
+      # 3. Instala a ferramenta Zowe CLI
       - name: Install Zowe CLI
         run: |
           npm install -g @zowe/cli@zowe-v2-lts
-          zowe config set-secure "plugins.ssh.knownHostsPolicy" "accept-new" --global
+          # CORREÇÃO: Sintaxe do comando 'zowe config' corrigida
+          zowe config set plugins.ssh.knownHostsPolicy accept-new --global
 
       # 4. Configura o ambiente no Mainframe e faz o Upload do COBOL Check
       - name: Setup Mainframe Environment and Upload COBOL Check
@@ -37,7 +38,7 @@ jobs:
           chmod +x .github/scripts/zowe_operations.sh
           .github/scripts/zowe_operations.sh
 
-      # 5. PASSO CORRIGIDO: Executa o COBOL Check no Mainframe
+      # 5. Executa o COBOL Check no Mainframe
       - name: Run COBOL Check on Mainframe
         env:
           ZOWE_CLI_USER: ${{ secrets.ZOWE_USERNAME }}
