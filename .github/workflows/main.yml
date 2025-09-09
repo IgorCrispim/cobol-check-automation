@@ -24,26 +24,35 @@ jobs:
       - name: Install Zowe CLI
         run: npm install -g @zowe/cli@zowe-v2-lts
 
-      # 4. Configura o ambiente no Mainframe e faz o Upload do COBOL Check
+      # 4. Cria e define os perfis Zowe padrão
+      - name: Create and Set Zowe Default Profiles
+        env:
+          ZOWE_USER: ${{ secrets.ZOWE_USERNAME }}
+          ZOWE_PASSWORD: ${{ secrets.ZOWE_PASSWORD }}
+          ZOWE_HOST: 204.90.115.200
+          ZOWE_PORT: 22
+        run: |
+          # Cria e define como padrão o perfil para comandos SSH e USS
+          # A opção --reject-unauthorized false lida com a verificação de impressão digital do SSH
+          zowe profiles create ssh default --host $ZOWE_HOST --port $ZOWE_PORT --user $ZOWE_USER --password $ZOWE_PASSWORD --reject-unauthorized false --overwrite
+          
+          # Cria e define como padrão o perfil para comandos zos-files
+          zowe profiles create zos-files default --host $ZOWE_HOST --port $ZOWE_PORT --user $ZOWE_USER --password $ZOWE_PASSWORD --reject-unauthorized false --overwrite
+
+      # 5. Configura o ambiente no Mainframe e faz o Upload do COBOL Check
       - name: Setup Mainframe Environment and Upload COBOL Check
         env:
-          ZOWE_CLI_USER: ${{ secrets.ZOWE_USERNAME }}
-          ZOWE_CLI_PASSWORD: ${{ secrets.ZOWE_PASSWORD }}
-          ZOWE_CLI_HOST: 204.90.115.200
-          ZOWE_CLI_PORT: 22
+          ZOWE_USER_FOR_SCRIPT: ${{ secrets.ZOWE_USERNAME }}
         run: |
           chmod +x .github/scripts/zowe_operations.sh
           .github/scripts/zowe_operations.sh
 
-      # 5. Executa o COBOL Check no Mainframe
+      # 6. Executa o COBOL Check no Mainframe
       - name: Run COBOL Check on Mainframe
         env:
-          ZOWE_CLI_USER: ${{ secrets.ZOWE_USERNAME }}
-          ZOWE_CLI_PASSWORD: ${{ secrets.ZOWE_PASSWORD }}
-          ZOWE_CLI_HOST: 204.90.115.200
-          ZOWE_CLI_PORT: 22
+          ZOWE_USER_FOR_SCRIPT: ${{ secrets.ZOWE_USERNAME }}
         run: |
-          LOWERCASE_USER=$(echo "${{ secrets.ZOWE_USERNAME }}" | tr '[:upper:]' '[:lower:]')
-          # CORREÇÃO: Adicionadas as opções de conexão explícitas ao comando ssh
-          zowe zos-uss issue ssh "cd /z/$LOWERCASE_USER/cobolcheck && bash .github/scripts/mainframe_operations.sh" --host $ZOWE_CLI_HOST --port $ZOWE_CLI_PORT --user $ZOWE_CLI_USER --password $ZOWE_CLI_PASSWORD --sshs-fingerprint-check false
+          LOWERCASE_USER=$(echo "$ZOWE_USER_FOR_SCRIPT" | tr '[:upper:]' '[:lower:]')
+          # Este comando agora usa o perfil SSH 'default' automaticamente
+          zowe zos-uss issue ssh "cd /z/$LOWERCASE_USER/cobolcheck && bash .github/scripts/mainframe_operations.sh"
 
