@@ -24,8 +24,8 @@ jobs:
       - name: Install Zowe CLI
         run: |
           npm install -g @zowe/cli@zowe-v2-lts
-          # CORREÇÃO: Sintaxe do comando 'zowe config' corrigida
-          zowe config set plugins.ssh.knownHostsPolicy accept-new --global
+          # CORREÇÃO DEFINITIVA: Sintaxe do comando 'zowe config' corrigida
+          zowe config set plugins.ssh.knownHostsPolicy accept-new -g
 
       # 4. Configura o ambiente no Mainframe e faz o Upload do COBOL Check
       - name: Setup Mainframe Environment and Upload COBOL Check
