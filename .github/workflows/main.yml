@@ -44,5 +44,6 @@ jobs:
           ZOWE_CLI_PORT: 22
         run: |
           LOWERCASE_USER=$(echo "${{ secrets.ZOWE_USERNAME }}" | tr '[:upper:]' '[:lower:]')
-          zowe zos-uss issue ssh "cd /z/$LOWERCASE_USER/cobolcheck && bash .github/scripts/mainframe_operations.sh"
+          # CORREÇÃO: Adicionadas as opções de conexão explícitas ao comando ssh
+          zowe zos-uss issue ssh "cd /z/$LOWERCASE_USER/cobolcheck && bash .github/scripts/mainframe_operations.sh" --host $ZOWE_CLI_HOST --port $ZOWE_CLI_PORT --user $ZOWE_CLI_USER --password $ZOWE_CLI_PASSWORD --sshs-fingerprint-check false
 
