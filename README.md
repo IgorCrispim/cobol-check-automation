@@ -1,1 +1,1 @@
-Teste 2.0
+Forçando a re-execução com a correção final do libsecre
