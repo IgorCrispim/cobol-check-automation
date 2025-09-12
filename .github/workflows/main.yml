@@ -33,7 +33,7 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -p $ZOWE_PORT -H $ZOWE_HOST >> ~/.ssh/known_hosts
 
-      # 5. Cria e define os perfis Zowe padrão (corrigido)
+      # 5. Cria e define os perfis Zowe padrão (corrigido com config init)
       - name: Create and Set Zowe Default Profiles
         env:
           ZOWE_USER: ${{ secrets.ZOWE_USERNAME }}
@@ -41,21 +41,17 @@ jobs:
           ZOWE_HOST: 204.90.115.200
           ZOWE_PORT: 22
         run: |
-          zowe profiles create ssh default \
-            --host $ZOWE_HOST \
-            --port $ZOWE_PORT \
-            --user $ZOWE_USER \
-            --password $ZOWE_PASSWORD \
-            --overwrite \
-            --no-secure-credential-store
+          # Inicializa configuração Zowe sem usar credential store
+          zowe config init --no-secure-credential-store -o
 
-          zowe profiles create zos-files default \
-            --host $ZOWE_HOST \
-            --port $ZOWE_PORT \
-            --user $ZOWE_USER \
-            --password $ZOWE_PASSWORD \
-            --overwrite \
-            --no-secure-credential-store
+          # Define propriedades base no arquivo de configuração
+          zowe config set profiles.base.properties.host $ZOWE_HOST
+          zowe config set profiles.base.properties.port $ZOWE_PORT
+          zowe config set profiles.base.properties.user $ZOWE_USER
+          zowe config set profiles.base.properties.password $ZOWE_PASSWORD
+
+          # Define perfil base como default
+          zowe config set defaults.base base
 
       # 6. Configura o ambiente no Mainframe e faz o Upload do COBOL Check
       - name: Setup Mainframe Environment and Upload COBOL Check
