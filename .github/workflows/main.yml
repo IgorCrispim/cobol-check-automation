@@ -1,3 +1,4 @@
+# Nome do workflow
 name: COBOL Check Automation
 
 on:
@@ -23,35 +24,34 @@ jobs:
           distribution: temurin
           java-version: '11'
 
-      # 3) Install system libs required by Keytar (libsecret) + unzip (if needed)
-      - name: Install system dependencies (libsecret)
+      # 3) Install system libs required by Keytar (libsecret) + unzip
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libsecret-1-0 libsecret-1-dev unzip
+          sudo apt-get install -y libsecret-1-0 libsecret-1-dev unzip curl
 
-      # 4) Ensure a Node runtime for npm installs
+      # 4) Setup Node.js (needed for npm global install)
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
 
-      # 5) Install Zowe CLI (v2 LTS)
+      # 5) Install Zowe CLI
       - name: Install Zowe CLI
         run: npm install -g @zowe/cli@zowe-v2-lts
 
-      # 6) Add mainframe host to known_hosts to avoid interactive prompt
+      # 6) Add mainframe host key to known_hosts
       - name: Add mainframe host key
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -p $ZOWE_PORT -H $ZOWE_HOST >> ~/.ssh/known_hosts
 
-      # 7) Create Zowe profiles (uses Keytar now that libsecret is installed)
-      - name: Create Zowe profiles (SSH and zos-files)
+      # 7) Create Zowe profiles (SSH and zos-files)
+      - name: Create Zowe profiles
         env:
           ZOWE_USER: ${{ secrets.ZOWE_USERNAME }}
           ZOWE_PASSWORD: ${{ secrets.ZOWE_PASSWORD }}
         run: |
-          # create SSH profile
           zowe profiles create ssh default \
             --host $ZOWE_HOST \
             --port $ZOWE_PORT \
@@ -59,7 +59,6 @@ jobs:
             --password "$ZOWE_PASSWORD" \
             --overwrite
 
-          # create zos-files profile (used for uploads)
           zowe profiles create zos-files default \
             --host $ZOWE_HOST \
             --port $ZOWE_PORT \
@@ -67,24 +66,27 @@ jobs:
             --password "$ZOWE_PASSWORD" \
             --overwrite
 
-      # 8) Quick debug: list config to confirm profiles
-      - name: Debug: show zowe config
-        run: zowe config list || true
+      # 8) Garantir que o diretório cobol-check existe (download automático)
+      - name: Ensure cobol-check directory
+        run: |
+          if [ ! -d "cobol-check" ]; then
+            echo "Directory cobol-check not found, downloading..."
+            curl -L -o cobol-check.zip https://github.com/openmainframeproject/cobol-check/releases/latest/download/cobol-check.zip
+            unzip cobol-check.zip -d cobol-check
+          fi
 
-      # 9) Run your zowe_operations.sh (upload cobol-check to /z/<user>/cobolcheck)
+      # 9) Upload cobol-check e setup no mainframe
       - name: Setup Mainframe Environment and Upload COBOL Check
         env:
-          ZOWE_USERNAME: ${{ secrets.ZOWE_USERNAME }}
-          ZOWE_PASSWORD: ${{ secrets.ZOWE_PASSWORD }}
+          ZOWE_USER_FOR_SCRIPT: ${{ secrets.ZOWE_USERNAME }}
         run: |
           chmod +x .github/scripts/zowe_operations.sh
           .github/scripts/zowe_operations.sh
 
-      # 10) Run mainframe_operations.sh (execute cobolcheck, copy CC##99.CBL, submit JCL)
+      # 10) Run cobol-check no mainframe
       - name: Run COBOL Check on Mainframe
         env:
-          ZOWE_USERNAME: ${{ secrets.ZOWE_USERNAME }}
-          ZOWE_PASSWORD: ${{ secrets.ZOWE_PASSWORD }}
+          ZOWE_USER_FOR_SCRIPT: ${{ secrets.ZOWE_USERNAME }}
         run: |
-          chmod +x .github/scripts/mainframe_operations.sh
-          .github/scripts/mainframe_operations.sh
+          LOWERCASE_USER=$(echo "$ZOWE_USER_FOR_SCRIPT" | tr '[:upper:]' '[:lower:]')
+          zowe zos-uss issue ssh "cd /z/$LOWERCASE_USER/cobolcheck && bash .github/scripts/mainframe_operations.sh"
