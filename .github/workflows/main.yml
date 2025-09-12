@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  cobol-check:
+  coblog-check:
     runs-on: ubuntu-latest
     steps:
       # 1. Faz o checkout do repositório
@@ -36,17 +36,14 @@ jobs:
       # 5. Cria e define os perfis Zowe padrão
       - name: Create and Set Zowe Default Profiles
         env:
-          # NOVO: Desativa o armazenamento seguro para compatibilidade com o ambiente do GitHub Actions
+          # ESTA É A CORREÇÃO CRUCIAL para o erro 'libsecret'
           ZOWE_SECURE_CREDENTIALS_STORE: "false" 
           ZOWE_USER: ${{ secrets.ZOWE_USERNAME }}
           ZOWE_PASSWORD: ${{ secrets.ZOWE_PASSWORD }}
           ZOWE_HOST: 204.90.115.200
           ZOWE_PORT: 22
         run: |
-          # Perfil para comandos SSH e USS
           zowe profiles create ssh default --host $ZOWE_HOST --port $ZOWE_PORT --user $ZOWE_USER --password $ZOWE_PASSWORD --overwrite
-          
-          # Perfil para comandos zos-files
           zowe profiles create zos-files default --host $ZOWE_HOST --port $ZOWE_PORT --user $ZOWE_USER --password $ZOWE_PASSWORD --overwrite
 
       # 6. Configura o ambiente no Mainframe e faz o Upload do COBOL Check
