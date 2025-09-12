@@ -1,3 +1,4 @@
+# Nome do workflow
 name: COBOL Check Automation
 
 on:
@@ -146,3 +147,4 @@ PYCODE
         run: |
           LOWERCASE_USER=$(echo "$ZOWE_USER_FOR_SCRIPT" | tr '[:upper:]' '[:lower:]')
           zowe zos-uss issue ssh "cd /z/$LOWERCASE_USER/cobolcheck && bash .github/scripts/mainframe_operations.sh"
+
