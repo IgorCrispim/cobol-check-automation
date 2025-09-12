@@ -1,6 +1,7 @@
 # Nome do workflow
 name: COBOL Check Automation
 
+# Aciona o workflow em push para a branch main
 on:
   push:
     branches: [ main ]
@@ -8,139 +9,52 @@ on:
 jobs:
   coblog-check:
     runs-on: ubuntu-latest
-    env:
-      ZOWE_HOST: 204.90.115.200
-      ZOWE_PORT: 22
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      # 1. Faz o checkout do repositório
+      - uses: actions/checkout@v2
 
-      - name: Set up Java 11
-        uses: actions/setup-java@v3
+      # 2. Configura o ambiente Java
+      - name: Set up Java
+        uses: actions/setup-java@v2
         with:
-          distribution: temurin
           java-version: '11'
-
-      - name: Setup Node.js (for npm)
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-
-      - name: Install system utilities (curl/unzip)
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y unzip curl
-
+          distribution: 'temurin'
+      
+      # 3. Instala a ferramenta Zowe CLI
       - name: Install Zowe CLI
         run: npm install -g @zowe/cli@zowe-v2-lts
 
-      - name: Add mainframe host key (avoid interactive SSH prompt)
+      # 4. Pré-aprova a chave do anfitrião SSH para evitar pedidos interativos
+      - name: Add Mainframe Host Key to Known Hosts
+        env:
+          ZOWE_HOST: 204.90.115.200
+          ZOWE_PORT: 22
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -p $ZOWE_PORT -H $ZOWE_HOST >> ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
 
-      - name: Create Zowe configuration (robust: config init -> set -> fallback to file)
+      # 5. Cria e define os perfis Zowe padrão
+      - name: Create and Set Zowe Default Profiles
         env:
+          # ESTA É A CORREÇÃO CRUCIAL para o erro 'libsecret'
+          ZOWE_SECURE_CREDENTIALS_STORE: "false" 
           ZOWE_USER: ${{ secrets.ZOWE_USERNAME }}
           ZOWE_PASSWORD: ${{ secrets.ZOWE_PASSWORD }}
+          ZOWE_HOST: 204.90.115.200
+          ZOWE_PORT: 22
         run: |
-          set -euo pipefail
-          echo "==> Try: zowe config init -o (non-interactive)"
-          # create initial config file non-interactive
-          if zowe config init -o >/dev/null 2>&1; then
-            echo "zowe config init -o succeeded"
-          else
-            echo "zowe config init -o returned non-zero (continuing; we'll try to set values)"
-          fi
+          zowe profiles create ssh default --host $ZOWE_HOST --port $ZOWE_PORT --user $ZOWE_USER --password $ZOWE_PASSWORD --overwrite
+          zowe profiles create zos-files default --host $ZOWE_HOST --port $ZOWE_PORT --user $ZOWE_USER --password $ZOWE_PASSWORD --overwrite
 
-          echo "==> Try: zowe config set ... (may fail on some CLI versions)"
-          if zowe config set profiles.base.properties.host "$ZOWE_HOST" \
-             && zowe config set profiles.base.properties.port "$ZOWE_PORT" \
-             && zowe config set profiles.base.properties.user "$ZOWE_USER" \
-             && zowe config set profiles.base.properties.password "$ZOWE_PASSWORD" \
-             && zowe config set profiles.\"zos-files\".properties.host "$ZOWE_HOST" \
-             && zowe config set profiles.\"zos-files\".properties.port "$ZOWE_PORT" \
-             && zowe config set profiles.\"zos-files\".properties.user "$ZOWE_USER" \
-             && zowe config set profiles.\"zos-files\".properties.password "$ZOWE_PASSWORD" \
-             && zowe config set defaults.base base
-          then
-            echo "zowe config set succeeded"
-          else
-            echo "zowe config set failed — writing ~/.zowe/zowe.config.json manually (fallback)"
-            mkdir -p ~/.zowe
-            # Write JSON with credentials (keeps them in the runner's filesystem)
-            cat > ~/.zowe/zowe.config.json <<'JSON_EOF'
-{
-  "profiles": {
-    "base": {
-      "type": "ssh",
-      "properties": {
-        "host": "${ZOWE_HOST}",
-        "port": ${ZOWE_PORT},
-        "user": "${ZOWE_USER}",
-        "password": "${ZOWE_PASSWORD}"
-      }
-    },
-    "zos-files": {
-      "type": "zos-files",
-      "properties": {
-        "host": "${ZOWE_HOST}",
-        "port": ${ZOWE_PORT},
-        "user": "${ZOWE_USER}",
-        "password": "${ZOWE_PASSWORD}"
-      }
-    }
-  },
-  "defaults": {
-    "base": "base"
-  }
-}
-JSON_EOF
-            # Expand variables inside file we just wrote (the heredoc above used single quotes to avoid expansion,
-            # so now replace tokens)
-            sed -i "s|\${ZOWE_HOST}|$ZOWE_HOST|g" ~/.zowe/zowe.config.json
-            sed -i "s|\${ZOWE_PORT}|$ZOWE_PORT|g" ~/.zowe/zowe.config.json
-            sed -i "s|\${ZOWE_USER}|$ZOWE_USER|g" ~/.zowe/zowe.config.json
-            # Password may contain slashes/quotes — use python to safely substitute if available
-            python3 - <<PYCODE || true
-import json,sys
-pfile = '/home/runner/.zowe/zowe.config.json'
-try:
-    data = json.load(open(pfile))
-    # inject the env password (already present as placeholder maybe)
-    import os
-    data['profiles']['base']['properties']['password'] = os.environ.get('ZOWE_PASSWORD','')
-    data['profiles']['zos-files']['properties']['password'] = os.environ.get('ZOWE_PASSWORD','')
-    json.dump(data, open(pfile,'w'), indent=2)
-except Exception as e:
-    print('python substitution failed:', e, file=sys.stderr)
-PYCODE
-          fi
-
-          # final quick check (not showing secrets); zowe config list will not print passwords
-          echo "==> Final zowe config (list):"
-          zowe config list || true
-
-      - name: Ensure cobol-check directory (download if missing)
-        run: |
-          if [ ! -d "cobol-check" ]; then
-            echo "Directory cobol-check not found — downloading latest release..."
-            curl -L -o cobol-check.zip https://github.com/openmainframeproject/cobol-check/releases/latest/download/cobol-check.zip
-            unzip -q cobol-check.zip -d cobol-check
-            rm -f cobol-check.zip
-          else
-            echo "cobol-check exists in repo; skipping download"
-          fi
-
+      # 6. Configura o ambiente no Mainframe e faz o Upload do COBOL Check
       - name: Setup Mainframe Environment and Upload COBOL Check
         env:
           ZOWE_USER_FOR_SCRIPT: ${{ secrets.ZOWE_USERNAME }}
         run: |
-          chmod +x .github/scripts/zowe_operations.sh || true
+          chmod +x .github/scripts/zowe_operations.sh
           .github/scripts/zowe_operations.sh
 
+      # 7. Executa o COBOL Check no Mainframe
       - name: Run COBOL Check on Mainframe
         env:
           ZOWE_USER_FOR_SCRIPT: ${{ secrets.ZOWE_USERNAME }}
