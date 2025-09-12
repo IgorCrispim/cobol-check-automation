@@ -1,7 +1,6 @@
 # Nome do workflow
 name: COBOL Check Automation
 
-# Aciona o workflow em push para a branch main
 on:
   push:
     branches: [ main ]
@@ -10,21 +9,17 @@ jobs:
   coblog-check:
     runs-on: ubuntu-latest
     steps:
-      # 1. Faz o checkout do repositório
       - uses: actions/checkout@v2
 
-      # 2. Configura o ambiente Java
       - name: Set up Java
         uses: actions/setup-java@v2
         with:
           java-version: '11'
           distribution: 'temurin'
       
-      # 3. Instala a ferramenta Zowe CLI
       - name: Install Zowe CLI
         run: npm install -g @zowe/cli@zowe-v2-lts
 
-      # 4. Pré-aprova a chave do anfitrião SSH para evitar pedidos interativos
       - name: Add Mainframe Host Key to Known Hosts
         env:
           ZOWE_HOST: 204.90.115.200
@@ -33,7 +28,6 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -p $ZOWE_PORT -H $ZOWE_HOST >> ~/.ssh/known_hosts
 
-      # 5. Cria e define os perfis Zowe padrão (corrigido com config init)
       - name: Create and Set Zowe Default Profiles
         env:
           ZOWE_USER: ${{ secrets.ZOWE_USERNAME }}
@@ -41,10 +35,10 @@ jobs:
           ZOWE_HOST: 204.90.115.200
           ZOWE_PORT: 22
         run: |
-          # Inicializa configuração Zowe sem usar credential store
-          zowe config init --no-secure-credential-store -o
+          # Inicializa configuração Zowe (sem credential store)
+          zowe config init -o
 
-          # Define propriedades base no arquivo de configuração
+          # Define propriedades
           zowe config set profiles.base.properties.host $ZOWE_HOST
           zowe config set profiles.base.properties.port $ZOWE_PORT
           zowe config set profiles.base.properties.user $ZOWE_USER
@@ -53,7 +47,9 @@ jobs:
           # Define perfil base como default
           zowe config set defaults.base base
 
-      # 6. Configura o ambiente no Mainframe e faz o Upload do COBOL Check
+          # Debug (opcional)
+          zowe config list
+
       - name: Setup Mainframe Environment and Upload COBOL Check
         env:
           ZOWE_USER_FOR_SCRIPT: ${{ secrets.ZOWE_USERNAME }}
@@ -61,7 +57,6 @@ jobs:
           chmod +x .github/scripts/zowe_operations.sh
           .github/scripts/zowe_operations.sh
 
-      # 7. Executa o COBOL Check no Mainframe
       - name: Run COBOL Check on Mainframe
         env:
           ZOWE_USER_FOR_SCRIPT: ${{ secrets.ZOWE_USERNAME }}
