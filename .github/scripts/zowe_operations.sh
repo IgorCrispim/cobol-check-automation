@@ -20,4 +20,3 @@ zowe zos-files upload dir-to-uss "./cobol-check" "$TARGET_DIR" --recursive --bin
 
 echo "Verificando o upload:"
 zowe zos-files list uss-files "$TARGET_DIR"
-
