@@ -45,16 +45,6 @@ jobs:
           cat > ~/.zowe/zowe.config.json <<EOF
           {
             "profiles": {
-              "zosmf": {
-                "type": "zosmf",
-                "properties": {
-                  "host": "$ZOWE_HOST",
-                  "port": $ZOWE_PORT,
-                  "user": "$ZOWE_USER",
-                  "password": "$ZOWE_PASSWORD",
-                  "rejectUnauthorized": false
-                }
-              },
               "ssh": {
                 "type": "ssh",
                 "properties": {
@@ -66,7 +56,6 @@ jobs:
               }
             },
             "defaults": {
-              "zosmf": "zosmf",
               "ssh": "ssh"
             }
           }
@@ -75,8 +64,8 @@ jobs:
 
       - name: Test Zowe Config
         run: |
-          # CORREÇÃO: Usando um comando válido para listar os perfis
-          zowe profiles list ssh --show-contents
+          # CORREÇÃO: Usando o comando V2 recomendado para listar a configuração
+          zowe config list
 
       - name: Setup Mainframe Environment and Upload COBOL Check
         env:
@@ -90,5 +79,6 @@ jobs:
           ZOWE_USER_FOR_SCRIPT: ${{ secrets.ZOWE_USERNAME }}
         run: |
           LOWERCASE_USER=$(echo "$ZOWE_USER_FOR_SCRIPT" | tr '[:upper:]' '[:lower:]')
-          zowe zos-uss issue ssh "cd /z/$LOWERCASE_USER/cobolcheck && bash .github/scripts/mainframe_operations.sh"
+          # Usando a flag --user-config para garantir que o nosso ficheiro é usado
+          zowe zos-uss issue ssh "cd /z/$LOWERCASE_USER/cobolcheck && bash .github/scripts/mainframe_operations.sh" --user-config
 
