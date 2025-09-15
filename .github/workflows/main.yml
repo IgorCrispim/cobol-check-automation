@@ -17,10 +17,11 @@ jobs:
           java-version: '11'
           distribution: 'temurin'
 
+      # Instala dependências de sistema, incluindo o 'gnupg'
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libsecret-1-0
+          sudo apt-get install -y libsecret-1-0 gpg
 
       - name: Install Zowe CLI
         run: npm install -g @zowe/cli@zowe-v2-lts
@@ -33,39 +34,25 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -p $ZOWE_PORT -H $ZOWE_HOST >> ~/.ssh/known_hosts
 
-      # 🔹 Aqui criamos o zowe.config.json
-      - name: Create Zowe Config
+      # Usa a abordagem de perfis, que é mais simples e direta
+      - name: Create and Set Zowe Default Profiles
         env:
+          ZOWE_SECURE_CREDENTIALS_STORE: "false" 
           ZOWE_USER: ${{ secrets.ZOWE_USERNAME }}
           ZOWE_PASSWORD: ${{ secrets.ZOWE_PASSWORD }}
           ZOWE_HOST: 204.90.115.200
           ZOWE_PORT: 22
         run: |
-          mkdir -p ~/.zowe
-          cat > ~/.zowe/zowe.config.json <<EOF
-          {
-            "profiles": {
-              "ssh": {
-                "type": "ssh",
-                "properties": {
-                  "host": "$ZOWE_HOST",
-                  "port": $ZOWE_PORT,
-                  "user": "$ZOWE_USER",
-                  "password": "$ZOWE_PASSWORD"
-                }
-              }
-            },
-            "defaults": {
-              "ssh": "ssh"
-            }
-          }
-          EOF
-          echo "Config file created at ~/.zowe/zowe.config.json"
+          zowe profiles create ssh default --host $ZOWE_HOST --port $ZOWE_PORT --user $ZOWE_USER --password $ZOWE_PASSWORD --overwrite
+          zowe profiles create zos-files default --host $ZOWE_HOST --port $ZOWE_PORT --user $ZOWE_USER --password $ZOWE_PASSWORD --overwrite
 
-      - name: Test Zowe Config
+      # NOVO PASSO DE VERIFICAÇÃO
+      - name: Verify Created Profiles (Debug)
         run: |
-          # CORREÇÃO: Usando o comando V2 recomendado para listar a configuração
-          zowe config list
+          echo "--- Verifying SSH Profile (password will not be shown) ---"
+          zowe profiles list ssh --show-contents
+          echo "--- Verifying zos-files Profile (password will not be shown) ---"
+          zowe profiles list zos-files --show-contents
 
       - name: Setup Mainframe Environment and Upload COBOL Check
         env:
@@ -79,6 +66,5 @@ jobs:
           ZOWE_USER_FOR_SCRIPT: ${{ secrets.ZOWE_USERNAME }}
         run: |
           LOWERCASE_USER=$(echo "$ZOWE_USER_FOR_SCRIPT" | tr '[:upper:]' '[:lower:]')
-          # Usando a flag --user-config para garantir que o nosso ficheiro é usado
-          zowe zos-uss issue ssh "cd /z/$LOWERCASE_USER/cobolcheck && bash .github/scripts/mainframe_operations.sh" --user-config
+          zowe zos-uss issue ssh "cd /z/$LOWERCASE_USER/cobolcheck && bash .github/scripts/mainframe_operations.sh"
 
