@@ -1,7 +1,6 @@
 # Nome do workflow
 name: COBOL Check Automation
 
-# Aciona o workflow em push para a branch main
 on:
   push:
     branches: [ main ]
@@ -10,24 +9,22 @@ jobs:
   coblog-check:
     runs-on: ubuntu-latest
     steps:
-      # 1. Faz o checkout do repositório
       - uses: actions/checkout@v2
 
-      # 2. Configura o ambiente Java
       - name: Set up Java
         uses: actions/setup-java@v2
         with:
           java-version: '11'
           distribution: 'temurin'
-      
-      # 3. Instala dependências do sistema (libsecret) + Zowe CLI
-      - name: Install Zowe CLI
+
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libsecret-1-0
-          npm install -g @zowe/cli@zowe-v2-lts
 
-      # 4. Pré-aprova a chave do anfitrião SSH para evitar pedidos interativos
+      - name: Install Zowe CLI
+        run: npm install -g @zowe/cli@zowe-v2-lts
+
       - name: Add Mainframe Host Key to Known Hosts
         env:
           ZOWE_HOST: 204.90.115.200
@@ -36,21 +33,51 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -p $ZOWE_PORT -H $ZOWE_HOST >> ~/.ssh/known_hosts
 
-      # 5. Cria e define os perfis Zowe usando o novo método
-      - name: Create and Set Zowe Default Profiles
+      # 🔹 Aqui criamos o zowe.config.json
+      - name: Create Zowe Config
         env:
-          ZOWE_SECURE_CREDENTIALS_STORE: "false" 
           ZOWE_USER: ${{ secrets.ZOWE_USERNAME }}
           ZOWE_PASSWORD: ${{ secrets.ZOWE_PASSWORD }}
           ZOWE_HOST: 204.90.115.200
           ZOWE_PORT: 22
         run: |
           mkdir -p ~/.zowe
-          zowe config init --host $ZOWE_HOST --port $ZOWE_PORT --user $ZOWE_USER --password $ZOWE_PASSWORD --overwrite
-          # Cria profile para arquivos z/OS (exemplo)
-          zowe zos-files list data-set $ZOWE_USER.*
+          cat > ~/.zowe/zowe.config.json <<EOF
+          {
+            "profiles": {
+              "zosmf": {
+                "type": "zosmf",
+                "properties": {
+                  "host": "$ZOWE_HOST",
+                  "port": $ZOWE_PORT,
+                  "user": "$ZOWE_USER",
+                  "password": "$ZOWE_PASSWORD",
+                  "rejectUnauthorized": false
+                }
+              },
+              "ssh": {
+                "type": "ssh",
+                "properties": {
+                  "host": "$ZOWE_HOST",
+                  "port": $ZOWE_PORT,
+                  "user": "$ZOWE_USER",
+                  "password": "$ZOWE_PASSWORD"
+                }
+              }
+            },
+            "defaults": {
+              "zosmf": "zosmf",
+              "ssh": "ssh"
+            }
+          }
+          EOF
+          echo "Config file created at ~/.zowe/zowe.config.json"
 
-      # 6. Configura o ambiente no Mainframe e faz o Upload do COBOL Check
+      - name: Test Zowe Config
+        run: |
+          zowe profiles list all
+          zowe zosmf check status
+
       - name: Setup Mainframe Environment and Upload COBOL Check
         env:
           ZOWE_USER_FOR_SCRIPT: ${{ secrets.ZOWE_USERNAME }}
@@ -58,7 +85,6 @@ jobs:
           chmod +x .github/scripts/zowe_operations.sh
           .github/scripts/zowe_operations.sh
 
-      # 7. Executa o COBOL Check no Mainframe
       - name: Run COBOL Check on Mainframe
         env:
           ZOWE_USER_FOR_SCRIPT: ${{ secrets.ZOWE_USERNAME }}
