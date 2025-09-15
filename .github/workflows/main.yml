@@ -75,8 +75,8 @@ jobs:
 
       - name: Test Zowe Config
         run: |
-          zowe profiles list all
-          zowe zosmf check status
+          # CORREÇÃO: Usando um comando válido para listar os perfis
+          zowe profiles list ssh --show-contents
 
       - name: Setup Mainframe Environment and Upload COBOL Check
         env:
@@ -91,3 +91,4 @@ jobs:
         run: |
           LOWERCASE_USER=$(echo "$ZOWE_USER_FOR_SCRIPT" | tr '[:upper:]' '[:lower:]')
           zowe zos-uss issue ssh "cd /z/$LOWERCASE_USER/cobolcheck && bash .github/scripts/mainframe_operations.sh"
+
