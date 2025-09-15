@@ -1,0 +1,63 @@
+# Nome do workflow
+name: COBOL Check Automation
+
+# Aciona o workflow em push para a branch main
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  coblog-check:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Faz o checkout do repositório
+      - uses: actions/checkout@v2
+
+      # 2. Configura o ambiente Java
+      - name: Set up Java
+        uses: actions/setup-java@v2
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+      
+      # 3. Instala a ferramenta Zowe CLI
+      - name: Install Zowe CLI
+        run: npm install -g @zowe/cli@zowe-v2-lts
+
+      # 4. Pré-aprova a chave do anfitrião SSH para evitar pedidos interativos
+      - name: Add Mainframe Host Key to Known Hosts
+        env:
+          ZOWE_HOST: 204.90.115.200
+          ZOWE_PORT: 22
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p $ZOWE_PORT -H $ZOWE_HOST >> ~/.ssh/known_hosts
+
+      # 5. Cria e define os perfis Zowe padrão
+      - name: Create and Set Zowe Default Profiles
+        env:
+          # ESTA É A CORREÇÃO CRUCIAL para o erro 'libsecret'
+          ZOWE_SECURE_CREDENTIALS_STORE: "false" 
+          ZOWE_USER: ${{ secrets.ZOWE_USERNAME }}
+          ZOWE_PASSWORD: ${{ secrets.ZOWE_PASSWORD }}
+          ZOWE_HOST: 204.90.115.200
+          ZOWE_PORT: 22
+        run: |
+          zowe profiles create ssh default --host $ZOWE_HOST --port $ZOWE_PORT --user $ZOWE_USER --password $ZOWE_PASSWORD --overwrite
+          zowe profiles create zos-files default --host $ZOWE_HOST --port $ZOWE_PORT --user $ZOWE_USER --password $ZOWE_PASSWORD --overwrite
+
+      # 6. Configura o ambiente no Mainframe e faz o Upload do COBOL Check
+      - name: Setup Mainframe Environment and Upload COBOL Check
+        env:
+          ZOWE_USER_FOR_SCRIPT: ${{ secrets.ZOWE_USERNAME }}
+        run: |
+          chmod +x .github/scripts/zowe_operations.sh
+          .github/scripts/zowe_operations.sh
+
+      # 7. Executa o COBOL Check no Mainframe
+      - name: Run COBOL Check on Mainframe
+        env:
+          ZOWE_USER_FOR_SCRIPT: ${{ secrets.ZOWE_USERNAME }}
+        run: |
+          LOWERCASE_USER=$(echo "$ZOWE_USER_FOR_SCRIPT" | tr '[:upper:]' '[:lower:]')
+          zowe zos-uss issue ssh "cd /z/$LOWERCASE_USER/cobolcheck && bash .github/scripts/mainframe_operations.sh"
