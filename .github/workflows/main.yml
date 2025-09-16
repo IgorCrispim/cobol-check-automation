@@ -24,8 +24,7 @@ jobs:
       - name: Install Zowe CLI
         run: npm install -g @zowe/cli@zowe-v2-lts
 
-      # 4. *** NOVA ETAPA DE CORREÇÃO ***
-      # Instala a dependência 'libsecret' para o Zowe poder salvar credenciais
+      # 4. Instala a dependência 'libsecret' para o Zowe
       - name: Install libsecret dependency for Zowe
         run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev
 
@@ -38,18 +37,21 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -p $ZOWE_PORT -H $ZOWE_HOST >> ~/.ssh/known_hosts
 
-      # 6. Cria e define os perfis Zowe padrão
+      # 6. Cria e define os perfis Zowe padrão (COM A CORREÇÃO FINAL)
       - name: Create and Set Zowe Default Profiles
         env:
+          # *** ESTA É A CORREÇÃO DEFINITIVA ***
+          # Força o Zowe a não usar o keyring do sistema, mesmo com a libsecret instalada
+          ZOWE_SECURE_CREDENTIALS_STORE: "false"
           ZOWE_USER: ${{ secrets.ZOWE_USERNAME }}
           ZOWE_PASSWORD: ${{ secrets.ZOWE_PASSWORD }}
           ZOWE_HOST: 204.90.115.200
           ZOWE_PORT: 22
         run: |
-          # Com a libsecret instalada, este comando agora funcionará como esperado
+          # Este comando agora deve funcionar de forma confiável
           zowe profiles create ssh default --host $ZOWE_HOST --port $ZOWE_PORT --user $ZOWE_USER --password $ZOWE_PASSWORD --overwrite
           zowe profiles create zos-files default --host $ZOWE_HOST --port $ZOWE_PORT --user $ZOWE_USER --password $ZOWE_PASSWORD --overwrite
-          echo "Zowe profiles created successfully."
+          echo "Zowe profiles created successfully using internal credential storage."
 
       # 7. Configura o ambiente no Mainframe e faz o Upload do COBOL Check
       - name: Setup Mainframe Environment and Upload COBOL Check
