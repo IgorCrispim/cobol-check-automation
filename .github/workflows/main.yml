@@ -14,7 +14,7 @@ jobs:
       - name: Checkout repository code
         uses: actions/checkout@v4
 
-      # 2. Configura o ambiente Java, necessário para o COBOL Check
+      # 2. Configura o ambiente Java
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -25,7 +25,7 @@ jobs:
       - name: Install Zowe CLI
         run: npm install -g @zowe/cli@zowe-v2-lts
 
-      # 4. Pré-aprova a chave do anfitrião SSH para evitar prompts interativos
+      # 4. Pré-aprova a chave do anfitrião SSH
       - name: Add Mainframe Host Key to Known Hosts
         env:
           ZOWE_HOST: 204.90.115.200
@@ -34,31 +34,21 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -p $ZOWE_PORT -H $ZOWE_HOST >> ~/.ssh/known_hosts
 
-      # 5. Cria e configura os perfis Zowe usando a abordagem moderna e robusta para CI/CD
+      # 5. Cria e define os perfis Zowe (MÉTODO CORRIGIDO E ALINHADO AO TUTORIAL)
       - name: Create and Set Zowe Default Profiles
         env:
+          # *** ESTA É A CORREÇÃO DEFINITIVA ***
+          # Força o Zowe a não usar o keyring do sistema, usando o método correto (variável de ambiente).
+          ZOWE_SECURE_CREDENTIALS_STORE: "false"
           ZOWE_USER: ${{ secrets.ZOWE_USERNAME }}
           ZOWE_PASSWORD: ${{ secrets.ZOWE_PASSWORD }}
           ZOWE_HOST: 204.90.115.200
+          ZOWE_PORT: 22
         run: |
-          # Inicializa a configuração do Zowe, instruindo-o a NÃO usar o keyring do sistema operacional.
-          # Esta é a correção definitiva para o erro 'org.freedesktop.secrets'.
-          zowe config init --global-config --user-config --no-secure-credential-store
-
-          # Cria um perfil "base" com as informações de conexão.
-          zowe config set "profiles.base.type" "zosmf" --global-config
-          zowe config set "profiles.base.properties.host" "$ZOWE_HOST" --global-config
-          
-          # Armazena o usuário e a senha de forma segura DENTRO dos arquivos de configuração do Zowe.
-          zowe config set "profiles.base.secure.user" "$ZOWE_USER" --secure --global-config
-          zowe config set "profiles.base.secure.password" "$ZOWE_PASSWORD" --secure --global-config
-
-          # Define este perfil "base" como o padrão para todos os tipos de comando (zosmf, ssh, files, etc.).
-          zowe config set "defaults.zosmf" "base" --global-config
-          zowe config set "defaults.ssh" "base" --global-config
-          zowe config set "defaults.files" "base" --global-config
-
-          echo "Zowe V2 config criado com sucesso, utilizando o armazenamento de credenciais interno."
+          # Usamos a sintaxe do tutorial, que agora funcionará graças à variável de ambiente acima.
+          zowe profiles create ssh default --host $ZOWE_HOST --port $ZOWE_PORT --user $ZOWE_USER --password $ZOWE_PASSWORD --overwrite
+          zowe profiles create zos-files default --host $ZOWE_HOST --port $ZOWE_PORT --user $ZOWE_USER --password $ZOWE_PASSWORD --overwrite
+          echo "Zowe profiles created successfully using internal credential storage."
 
       # 6. Configura o ambiente no Mainframe e faz o Upload do COBOL Check
       - name: Setup Mainframe Environment and Upload COBOL Check
@@ -74,5 +64,4 @@ jobs:
           ZOWE_USER_FOR_SCRIPT: ${{ secrets.ZOWE_USERNAME }}
         run: |
           LOWERCASE_USER=$(echo "$ZOWE_USER_FOR_SCRIPT" | tr '[:upper:]' '[:lower:]')
-          # O Zowe usará automaticamente o perfil padrão configurado no passo 5.
           zowe zos-uss issue ssh "cd /z/$LOWERCASE_USER/cobolcheck && bash .github/scripts/mainframe_operations.sh"
