@@ -33,33 +33,27 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -p $ZOWE_PORT -H $ZOWE_HOST >> ~/.ssh/known_hosts
 
-           # 5. Cria e define os perfis Zowe padrão
+      # 5. Cria e define os perfis Zowe padrão
       - name: Create and Set Zowe Default Profiles
         env:
+          # ESTA É A CORREÇÃO CRUCIAL para o erro 'libsecret'/'gnome-keyring'
           ZOWE_SECURE_CREDENTIALS_STORE: "false" 
           ZOWE_USER: ${{ secrets.ZOWE_USERNAME }}
           ZOWE_PASSWORD: ${{ secrets.ZOWE_PASSWORD }}
           ZOWE_HOST: 204.90.115.200
           ZOWE_PORT: 22
         run: |
-          # Inicializa a configuração do Zowe e define o perfil base como padrão
-          zowe config init --global-config
-          zowe config set "profiles.base.properties.host" "$ZOWE_HOST" --global-config
-          zowe config set "profiles.base.properties.port" $ZOWE_PORT --global-config
-          
-          # Define as credenciais de forma segura
-          zowe config set "profiles.base.secure.user" "$ZOWE_USER" --secure --global-config
-          zowe config set "profiles.base.secure.password" "$ZOWE_PASSWORD" --secure --global-config
-          
-          # Confirma que a configuração foi salva (opcional, bom para debug)
-          echo "Zowe config setup complete."
-          zowe config list --global-config --show-secure
-
+          # Cria perfis SSH e z/OS Files usando a sintaxe V1, que ainda é suportada para simplicidade
+          # A variável ZOWE_SECURE_CREDENTIALS_STORE="false" força o Zowe a usar seu armazenamento interno
+          zowe profiles create ssh default --host $ZOWE_HOST --port $ZOWE_PORT --user $ZOWE_USER --password $ZOWE_PASSWORD --overwrite
+          zowe profiles create zos-files default --host $ZOWE_HOST --port $ZOWE_PORT --user $ZOWE_USER --password $ZOWE_PASSWORD --overwrite
+          echo "Zowe profiles created successfully."
 
       # 6. Configura o ambiente no Mainframe e faz o Upload do COBOL Check
       - name: Setup Mainframe Environment and Upload COBOL Check
         env:
-          ZOWE_USER_FOR_SCRIPT: ${{ secrets.ZOWE_USERNAME }}
+          # Passa o nome de usuário para o script, que o converterá para minúsculas
+          ZOWE_USERNAME: ${{ secrets.ZOWE_USERNAME }}
         run: |
           chmod +x .github/scripts/zowe_operations.sh
           .github/scripts/zowe_operations.sh
@@ -67,7 +61,10 @@ jobs:
       # 7. Executa o COBOL Check no Mainframe
       - name: Run COBOL Check on Mainframe
         env:
+          # O script mainframe_operations.sh já deve ter o nome de usuário
+          # Mas podemos passá-lo novamente para garantir
           ZOWE_USER_FOR_SCRIPT: ${{ secrets.ZOWE_USERNAME }}
         run: |
           LOWERCASE_USER=$(echo "$ZOWE_USER_FOR_SCRIPT" | tr '[:upper:]' '[:lower:]')
           zowe zos-uss issue ssh "cd /z/$LOWERCASE_USER/cobolcheck && bash .github/scripts/mainframe_operations.sh"
+
